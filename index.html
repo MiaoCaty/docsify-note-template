@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>hearty notes</title>
+  <link rel="stylesheet" href="./css/vue.css">
+  <link rel="stylesheet" href="./css/katex.min.css">
+  <link rel="stylesheet" href="./css/dark.min.css" title="docsify-darklight-theme" type="text/css">
+  
+  <style>
+    /**
+     * UI COMPONENT: SIDEBAR PROGRESS CAPSULE
+     * A minimalist vertical capsule indicating reading progress.
+     * Uses backdrop-filter for a modern frosted glass look.
+     */
+    html body #progress-capsule {
+      position: fixed;
+      right: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 6px;
+      height: 100px;
+      background: rgba(128, 128, 128, 0.2);
+      border-radius: 10px;
+      z-index: 1002; /* Higher than AI overlay but lower than sidebar toggle */
+      overflow: hidden;
+      backdrop-filter: blur(4px);
+      pointer-events: none; /* Prevents interference with clicking underlying content */
+    }
+
+    html body #progress-fill {
+      width: 100%;
+      height: 0%; 
+      background: #42b983; 
+      border-radius: 10px;
+      transition: height 0.1s ease-out;
+      box-shadow: 0 0 8px rgba(66, 185, 131, 0.4);
+    }
+
+    /**
+     * CORE LAYOUT: HORIZONTAL SCROLL REPAIR
+     * We use deep selector chaining (html body .class) to increase CSS specificity 
+     * without relying on !important, making it easier to maintain.
+     */
+    html body .markdown-section .katex, 
+    html body .markdown-section .katex-display, 
+    html body .markdown-section .tex-wrapper {
+      max-width: none;
+      overflow: visible; /* Allow formulas to exceed container width to trigger parent scroll */
+      white-space: nowrap; 
+    }
+    
+    html body .markdown-section .katex-display {
+      display: block;
+      padding: 12px 0;
+    }
+
+    /**
+     * BUG FIX: DOCSIFY SIDEBAR TOGGLE
+     * Ensures the hamburger menu remains visible in mobile view/F12 simulator.
+     */
+    html body .sidebar-toggle {
+      z-index: 1005; /* Maximum priority to stay above all custom UI overlays */
+    }
+
+    /**
+     * MOBILE RESPONSIVE OPTIMIZATION
+     * Handles the specific horizontal scrolling logic for small screens.
+     */
+    @media screen and (max-width: 768px) {
+      /* Fix: Ensure the content container is constrained to viewport width to trigger overflow-x */
+      html body .content, 
+      html body .markdown-section {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch; /* Momentum scrolling for iOS */
+        max-width: 100vw; 
+        box-sizing: border-box;
+      }
+
+      html body #progress-capsule {
+        right: 8px;
+        height: 60px;
+      }
+      
+      html body #ai-trigger .trigger-text { display: none; }
+      html body #docsify-darklight-theme { right: 65px; }
+    }
+
+    /**
+     * THEME SYSTEM: GLOBAL STYLES
+     */
+    body {
+      background-color: #ffffff;
+      transition: background-color 0.3s ease;
+    }
+
+    html body.is-dark, 
+    html body.is-dark #app, 
+    html body.is-dark .content {
+      background-color: #1b1b1f;
+      color: #cccccc;
+    }
+
+    html body.is-dark img {
+      filter: invert(90%) hue-rotate(180deg);
+      transition: filter 0.3s ease;
+    }
+    html body.is-dark img.no-invert { filter: none; }
+
+    /**
+     * AI ASSISTANT & PLUGIN UI ELEMENTS
+     */
+    html body #ai-trigger {
+      position: fixed; top: 10px; right: 10px; z-index: 99; 
+      background: #42b983; color: white; border: none; padding: 10px 16px;
+      border-radius: 50px; cursor: pointer; font-weight: 600;
+      box-shadow: 0 4px 12px rgba(66, 185, 131, 0.3); 
+      display: flex; align-items: center; gap: 8px; font-size: 14px;
+    }
+
+    html body #docsify-darklight-theme {
+      position: fixed; top: 10px; right: 125px;
+      width: 50px; height: 26px;
+      background: #eeeeee; border-radius: 20px;
+      border: 1px solid #dcdcdc; z-index: 999;
+    }
+
+    html body #docsify-darklight-theme::after {
+      content: '🔅';
+      position: absolute; top: 2px; left: 3px;
+      width: 20px; height: 20px;
+      background: #ffffff; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    html body.is-dark #docsify-darklight-theme { background: #333333; border-color: #444444; }
+    html body.is-dark #docsify-darklight-theme::after { content: '🪐'; transform: translateX(23px); }
+
+    html body #ai-sidebar {
+      position: fixed; top: 0; right: 0; width: 400px; height: 100%;
+      background: white; z-index: 1001; 
+      transform: translateX(100%);
+      transition: transform 0.4s ease;
+      display: flex; flex-direction: column;
+      box-shadow: -4px 0 12px rgba(0,0,0,0.05);
+    }
+    html body #ai-sidebar.open { transform: translateX(0); }
+    html body.is-dark #ai-sidebar { background: #000000; }
+    
+    #ai-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.2); backdrop-filter: blur(4px); z-index: 1000; display: none; }
+    #ai-overlay.show { display: block; }
+    .sidebar-header { padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f0f0f0; }
+    html body.is-dark .sidebar-header { border-bottom: 1px solid #222222; }
+    .close-btn { background: none; border: none; color: #999; font-size: 20px; cursor: pointer; }
+  </style>
+
+  <script>
+    /**
+     * ANTI-FOUC (Flash of Unstyled Content) SCRIPT
+     * Sets dark theme instantly before the page renders.
+     */
+    (function() {
+      const theme = localStorage.getItem('DARK_LIGHT_THEME') || 'dark';
+      if (theme === 'dark') {
+        document.documentElement.classList.add('is-dark');
+        const style = document.createElement('style');
+        style.id = 'anti-fouc-style';
+        style.innerHTML = `
+          html body, html body #app { background-color: #1b1b1f; color: #cccccc; }
+          html body .sidebar { background-color: #1b1b1f; }
+        `;
+        document.head.appendChild(style);
+      }
+    })();
+  </script>
+</head>
+
+<body>
+  <div id="progress-capsule">
+    <div id="progress-fill"></div>
+  </div>
+
+  <div id="app" style="text-align: center; margin-top: 50px;">
+    <span style="font-family: sans-serif; opacity: 0.6;">✨ loading...</span>
+  </div>
+
+  <button id="ai-trigger" onclick="toggleAI(true)">
+    <span>🪄</span><span class="trigger-text">Ask AI</span>
+  </button>
+  
+  <div id="ai-overlay" onclick="toggleAI(false)"></div>
+   
+  <aside id="ai-sidebar">
+    <div class="sidebar-header">
+      <span style="font-weight: bold; color: #42b983;">🤖 AI Assistant</span>
+      <button onclick="toggleAI(false)" class="close-btn">✕</button>
+    </div>
+    <iframe id="ai-frame" style="flex:1; border:none;"></iframe>
+  </aside>
+
+  <script>
+    /**
+     * PERFORMANCE OPTIMIZATION: SCROLL THROTTLING
+     * Uses requestAnimationFrame (rAF) to decouple scroll events from DOM updates.
+     * This prevents layout thrashing and ensures 60fps performance.
+     */
+    let ticking = false;
+    const updateProgress = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const winScroll = document.body.scrollTop || document.documentElement.scrollTop;
+          const docHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+          const scrolled = (winScroll / docHeight) * 100;
+          
+          const progressFill = document.getElementById('progress-fill');
+          if (progressFill) {
+            progressFill.style.height = (isNaN(scrolled) ? 0 : scrolled) + "%";
+          }
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    // Use passive listener to improve touch performance on mobile devices
+    window.addEventListener('scroll', updateProgress, { passive: true });
+    window.addEventListener('resize', updateProgress);
+
+    /**
+     * UI CONTROL: AI SIDEBAR
+     */
+    function toggleAI(show) {
+      const sidebar = document.getElementById('ai-sidebar');
+      const overlay = document.getElementById('ai-overlay');
+      const iframe = document.getElementById('ai-frame');
+      if (show && !iframe.src) iframe.src = "https://127.0.0.1";
+      sidebar.classList.toggle('open', show);
+      overlay.classList.toggle('show', show);
+      document.body.style.overflow = show ? 'hidden' : '';
+    }
+
+    /**
+     * THEME SYNCHRONIZATION MODULE
+     */
+    function syncThemeState() {
+      const isDark = localStorage.getItem('DARK_LIGHT_THEME') === 'dark';
+      document.documentElement.classList.toggle('is-dark', isDark);
+      document.body.classList.toggle('is-dark', isDark);
+      const antiFouc = document.getElementById('anti-fouc-style');
+      if (antiFouc) antiFouc.remove();
+    }
+
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((m) => {
+        if (m.attributeName === 'class' || m.attributeName === 'style') {
+          syncThemeState();
+        }
+      });
+    });
+    
+    observer.observe(document.documentElement, { attributes: true });
+    window.addEventListener('load', syncThemeState);
+
+    /**
+     * DOCSIFY CONFIGURATION
+     */
+    window.$docsify = {
+      name: 'hearty notes',
+      loadSidebar: true,
+      subMaxLevel: 3,
+      maxLevel: 5,
+      darklightTheme: {
+        defaultTheme: 'dark',
+        dark: {
+          accent: '#42b983', background: '#1b1b1f', textColor: '#c1c1c1',        
+          codeBackgroundColor: '#202127', borderColor: '#353535',      
+          blockQuoteColor: '#858585', highlightColor: '#d22778',
+          sidebarSublink: '#aaaaaa', codeTypeColor: '#ffffff', coverBackground: '#202127',
+        },
+        light: {
+          accent: '#42b983', background: '#ffffff', textColor: '#34495e',
+          codeBackgroundColor: '#f8f8f8', borderColor: 'rgba(0,0,0,.07)',
+          blockQuoteColor: '#858585', highlightColor: '#d22778',
+          sidebarSublink: '#505d6b', codeTypeColor: '#000000',
+          coverBackground: 'linear-gradient(to left bottom, hsl(118, 100%, 85%) 0%,hsl(181, 100%, 85%) 100%)',
+        }
+      },
+      markdown: {
+        renderer: {
+          code: function(code, lang) {
+            if (lang === "tex" || lang === "latex") {
+              return '<div class="tex-wrapper">' + 
+                katex.renderToString(code.trim(), { displayMode: true, throwOnError: false }) + '</div>';
+            }
+            return this.origin.code.apply(this, arguments);
+          }
+        }
+      }
+    }
+  </script>
+
+  <script src="./script/docsify.min.js"></script>
+  <script src="./script/dark-index.min.js"></script>
+  <script defer src="./script/katex.min.js"></script>
+  <script defer src="./script/mhchem.min.js"></script>
+  <script defer src="./script/docsify-katex.js"></script>
+</body>
+</html>
