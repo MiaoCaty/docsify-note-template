@@ -107,6 +107,55 @@
       transition: filter 0.3s ease;
     }
     html body.is-dark img.no-invert { filter: none; }
+	
+	  html:not(.is-dark) body .markdown-section em {
+	    color: #3fb497 !important; 
+    }
+	  /* italic text color in dark mode */
+	  html.is-dark body .markdown-section em,
+	  html.is-dark #app .markdown-section em,
+	  html.is-dark .markdown-section em {
+	    color: #999999 !important;
+	    font-style: italic !important;
+	  }
+
+    /**
+     * Auto Formatting Optimization
+     * Automatically increase line height and spacing for all body text, lists, and chemical formula paragraphs
+     */
+    html body .markdown-section p, 
+    html body .markdown-section li,
+    html body .markdown-section .tex-wrapper {
+      line-height: 1.8; /* ideal */
+      margin-bottom: 1rem; /* spacing automatically increases after rendering even if no Entered*/
+      letter-spacing: 0.02em; /* finetune */
+    }
+
+    /* optimize text density for tables */
+    html body .markdown-section ul li, 
+    html body .markdown-section ol li {
+      margin-bottom: 0.8rem; 
+    }
+
+    /* for fomula boxes */
+    html body .markdown-section .katex-display {
+      margin: 1.5rem 0;
+    }
+	
+	  /* edit table eage color in dark mode */
+	  html body.is-dark .markdown-section table,
+	  html body.is-dark .markdown-section tr,
+	  html body.is-dark .markdown-section td,
+	  html body.is-dark .markdown-section th {
+	    border-color: #333333 !important;
+	  }
+    
+    html body.is-dark hr { /* dark mode separate line styling */
+      background-color: #333333;
+      border: none;
+      height: 1px;
+      margin: 2rem 0;
+    }
 
     /**
      * AI ASSISTANT & PLUGIN UI ELEMENTS
@@ -288,14 +337,14 @@
       },
       markdown: {
         renderer: {
-          code: function(code, lang) {
+		  code: function(code, lang) {
             if (lang === "tex" || lang === "latex") {
               return '<div class="tex-wrapper">' + 
                 katex.renderToString(code.trim(), { displayMode: true, throwOnError: false }) + '</div>';
             }
             return this.origin.code.apply(this, arguments);
           }
-        }
+        },
       }
     }
   </script>
